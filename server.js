@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -17,6 +16,7 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://mohamedbeyhaqi:bQJx9Jfw
 
 // Define Schema & Model
 const gpsSchema = new mongoose.Schema({
+  deviceId: { type: String, required: true, unique: true },
   phoneName: { type: String, required: true },
   latitude: { type: Number, required: true },
   longitude: { type: Number, required: true },
@@ -31,21 +31,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Endpoint to Save GPS Data
 app.post('/api/gps', async (req, res) => {
-  const { latitude, longitude, phoneName } = req.body;
-  if (!latitude || !longitude || !phoneName) {
-    return res.status(400).json({ error: 'Missing coordinates or phone name' });
+  const { latitude, longitude, deviceId, phoneName } = req.body;
+  console.log(`Received location update from ${deviceId} (${phoneName}): ${latitude}, ${longitude}`);
+  
+  if (!latitude || !longitude || !deviceId || !phoneName) {
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    // Create or update the location for the specific phone
-    await GPS.findOneAndUpdate(
-      { phoneName },
-      { latitude, longitude, timestamp: new Date() },
+    const result = await GPS.findOneAndUpdate(
+      { deviceId },
+      { phoneName, latitude, longitude, timestamp: new Date() },
       { upsert: true, new: true }
     );
+    console.log(`Location updated for ${deviceId}:`, result);
     res.json({ success: true, message: 'Location updated successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'DB Error' });
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -53,9 +56,11 @@ app.post('/api/gps', async (req, res) => {
 app.get('/api/gps', async (req, res) => {
   try {
     const locations = await GPS.find().sort({ timestamp: -1 });
+    console.log(`Sending ${locations.length} locations`);
     res.json(locations);
   } catch (err) {
-    res.status(500).json({ error: 'DB Error' });
+    console.error('Database error:', err);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
