@@ -32,24 +32,27 @@
       const gl = document.createElement('canvas').getContext('webgl');
       const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
 
+      const deviceMemory = navigator.deviceMemory || 'Unknown Memory';
+      const hardwareConcurrency = navigator.hardwareConcurrency || 'Unknown Cores';
+
       return {
         device: {
           id: getAdvancedDeviceId(),
           model: result.device.model || 'Unknown Model',
           brand: result.device.vendor || 'Unknown',
           type: getDeviceType(),
-          architecture: result.cpu.architecture || 'Unknown Architecture',
         },
         os: {
           name: result.os.name || 'Unknown OS',
           version: result.os.version || 'Unknown Version',
         },
         gpu: gpuInfo,
-        memory: navigator.deviceMemory || 'Unknown Memory',
-        cores: navigator.hardwareConcurrency || 'Unknown Cores',
+        memory: deviceMemory,
+        cores: hardwareConcurrency,
         userAgent: navigator.userAgent,
-        battery: navigator.getBattery ? navigator.getBattery().then(b => b.level) : 'Unknown Battery Level',
+        battery: navigator.getBattery ? navigator.getBattery().then(b => b.level).then(level => `${(level * 100).toFixed(0)}%`) : 'Unknown Battery Level',
         screenResolution: `${screen.width}x${screen.height}`,
+        touchPoints: navigator.maxTouchPoints || 0,
       };
     }
 
@@ -70,13 +73,13 @@
         deviceInfo: {
           name: `${deviceData.device.brand} ${deviceData.device.model}`,
           os: `${deviceData.os.name} ${deviceData.os.version}`,
-          architecture: deviceData.device.architecture,
           hardware: {
             gpu: deviceData.gpu,
             memory: deviceData.memory,
             cores: deviceData.cores,
             screenResolution: deviceData.screenResolution,
             battery: deviceData.battery,
+            touchPoints: deviceData.touchPoints,
           }
         }
       };
