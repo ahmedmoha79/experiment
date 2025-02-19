@@ -1,80 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Real GPS Tracker</title>
+  <title>Advanced GPS Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>#map{height:100vh;width:100%;margin:0}</style>
 </head>
 <body>
   <div id="map"></div>
+  
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ua-parser-js/dist/ua-parser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
   <script>
     const map = L.map('map').setView([-13.1339, 27.8493], 10);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // Generate or retrieve unique device ID
-    function getDeviceId() {
-      let deviceId = localStorage.getItem('deviceId');
+    // 1. Device Fingerprinting
+    function getAdvancedDeviceId() {
+      let deviceId = localStorage.getItem('advDeviceId');
       if (!deviceId) {
-        deviceId = crypto.randomUUID();
-        localStorage.setItem('deviceId', deviceId);
+        const rand = crypto.getRandomValues(new Uint32Array(4));
+        deviceId = `DEV-${rand[0]}-${Date.now()}`;
+        localStorage.setItem('advDeviceId', deviceId);
       }
       return deviceId;
     }
 
-    // Advanced device name detection using UAParser.js
-    function getDeviceInfo() {
+    // 2. Advanced Device Profiling
+    function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
-
+      
+      // Additional hardware detection
+      const gl = document.createElement('canvas').getContext('webgl');
+      const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'unknown';
+      
       return {
-        deviceId: getDeviceId(),
-        deviceName: result.device.model || result.os.name || 'Unknown Device',
-        deviceBrand: result.device.vendor || 'Unknown Brand',
-        os: result.os.name || 'Unknown OS',
-        osVersion: result.os.version || 'Unknown Version',
-        browser: result.browser.name || 'Unknown Browser',
-        browserVersion: result.browser.version || 'Unknown Version',
-        cpu: result.cpu.architecture || 'Unknown CPU',
+        device: {
+          id: getAdvancedDeviceId(),
+          model: result.device.model || this.getModelFromUA(),
+          brand: result.device.vendor || 'Unknown',
+          type: this.getDeviceType(),
+        },
+        os: {
+          name: result.os.name || 'Unknown',
+          version: result.os.version || 'Unknown',
+        },
+        gpu: gpuInfo,
+        memory: navigator.deviceMemory || 'unknown',
+        cores: navigator.hardwareConcurrency || 'unknown',
         userAgent: navigator.userAgent
       };
     }
 
-    const deviceInfo = getDeviceInfo();
-    console.log('Device Info:', deviceInfo);
-
-    function sendLocation(lat, lng) {
-      fetch('/api/gps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          latitude: lat, 
-          longitude: lng, 
-          deviceId: deviceInfo.deviceId,
-          phoneName: `${deviceInfo.deviceBrand} ${deviceInfo.deviceName} (${deviceInfo.os} ${deviceInfo.osVersion})`,
-          additionalInfo: deviceInfo
-        })
-      })
-      .then(response => {
-        if (!response.ok) {
-          console.error('Server error:', response.status);
-          return response.text().then(text => { throw new Error(text) });
-        }
-        return response.json();
-      })
-      .then(data => console.log('Location saved:', data))
-      .catch(e => console.error('Error:', e));
+    // 3. Fallback Methods
+    function getModelFromUA() {
+      const ua = navigator.userAgent;
+      // Samsung detection
+      const samsungMatch = ua.match(/SM-([A-Z0-9]+)/);
+      if (samsungMatch) return `Samsung Galaxy ${samsungMatch[1]}`;
+      
+      // Generic Android detection
+      const androidModelMatch = ua.match(/Android.*;\s([a-zA-Z0-9-]+)\sBuild/);
+      return androidModelMatch ? androidModelMatch[1] : 'Unknown Model';
     }
 
+    function getDeviceType() {
+      const touchPoints = navigator.maxTouchPoints || 0;
+      if (touchPoints > 2) return 'Smartphone';
+      if (screen.width > 1024) return 'Desktop';
+      return 'Tablet/Other';
+    }
+
+    // 4. Location Handling
+    function sendAdvancedLocation(lat, lng) {
+      const deviceData = getDeviceDetails();
+      
+      const payload = {
+        latitude: lat,
+        longitude: lng,
+        deviceId: deviceData.device.id,
+        deviceInfo: {
+          name: `${deviceData.device.brand} ${deviceData.device.model}`,
+          os: `${deviceData.os.name} ${deviceData.os.version}`,
+          hardware: {
+            gpu: deviceData.gpu,
+            memory: deviceData.memory,
+            cores: deviceData.cores
+          }
+        }
+      };
+
+      console.log('Sending:', payload);
+      
+      fetch('/api/gps', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      }).catch(e => console.error('Error:', e));
+    }
+
+    // 5. Geolocation
     navigator.geolocation.watchPosition(
       pos => {
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
         if (marker) marker.remove();
         marker = L.marker([lat, lng]).addTo(map);
         map.setView([lat, lng], 15);
-        sendLocation(lat, lng);
+        sendAdvancedLocation(lat, lng);
       },
       err => alert('GPS Error: ' + err.message),
       { enableHighAccuracy: true }
