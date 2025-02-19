@@ -1,39 +1,49 @@
+// server.js
+require('dotenv').config();
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Initialize SQLite DB
-const db = new sqlite3.Database('./database.db', (err) => {
-  if (err) return console.error('DB Error:', err.message);
-  db.run(`CREATE TABLE IF NOT EXISTS tracking (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vehicle_id TEXT NOT NULL,
-    latitude REAL NOT NULL,
-    longitude REAL NOT NULL,
-    timestamp DATETIME NOT NULL
-  )`, (err) => err ? console.error('Table Error:', err) : console.log('DB Ready'));
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI || '<mongodb+srv://mohamedbeyhaqi:<bQJx9JfwQNlJEXOE>@cluster0.eu65h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0>', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => console.log('MongoDB Connected'))
+  .catch(err => console.error('MongoDB Error:', err));
+
+// Define Schema & Model
+const gpsSchema = new mongoose.Schema({
+  latitude: Number,
+  longitude: Number,
+  timestamp: { type: Date, default: Date.now }
 });
+const GPS = mongoose.model('GPS', gpsSchema);
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API Endpoints
-app.post('/api/gps', (req, res) => {
-  const { latitude, longitude, timestamp } = req.body;
+// API Endpoint to Save GPS Data
+app.post('/api/gps', async (req, res) => {
+  const { latitude, longitude } = req.body;
   if (!latitude || !longitude) return res.status(400).json({ error: 'Missing coordinates' });
-  
-  db.run(`INSERT INTO tracking VALUES (?,?,?,?,?)`, [
-    null, 'A74', latitude, longitude, timestamp || new Date().toISOString()
-  ], (err) => err ? res.status(500).json({ error: 'DB Error' }) : res.json({ success: true }));
+
+  try {
+    await new GPS({ latitude, longitude }).save();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'DB Error' });
+  }
 });
 
-// Serve frontend
+// Serve Frontend
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Start server
+// Start Server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
