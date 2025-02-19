@@ -24,13 +24,13 @@ const gpsSchema = new mongoose.Schema({
   deviceInfo: {
     name: String,
     os: String,
-    architecture: String,
     hardware: {
       gpu: String,
       memory: String,
       cores: String,
       screenResolution: String,
-      battery: String
+      battery: String,
+      touchPoints: Number,
     }
   },
   rawData: {
