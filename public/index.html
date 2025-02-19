@@ -14,8 +14,18 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // Get the phone name (you can customize this logic to get the actual phone name)
-    const phoneName = 'User\'s Phone'; // Replace with actual logic to get the phone name if available
+    // Extract device name from User-Agent
+    function getDeviceName() {
+      const ua = navigator.userAgent;
+      if (/android/i.test(ua)) return 'Android Device';
+      if (/iphone/i.test(ua)) return 'iPhone';
+      if (/ipad/i.test(ua)) return 'iPad';
+      if (/windows/i.test(ua)) return 'Windows PC';
+      if (/macintosh|mac os x/i.test(ua)) return 'Mac Device';
+      return 'Unknown Device';
+    }
+    
+    const phoneName = getDeviceName();
 
     function sendLocation(lat, lng) {
       fetch('/api/gps', {
