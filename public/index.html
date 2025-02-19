@@ -15,7 +15,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // 1. Device Fingerprinting
     function getAdvancedDeviceId() {
       let deviceId = localStorage.getItem('advDeviceId');
       if (!deviceId) {
@@ -26,41 +25,36 @@
       return deviceId;
     }
 
-    // 2. Advanced Device Profiling
     function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
       
-      // Additional hardware detection
       const gl = document.createElement('canvas').getContext('webgl');
-      const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'unknown';
-      
+      const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
+
       return {
         device: {
           id: getAdvancedDeviceId(),
-          model: result.device.model || this.getModelFromUA(),
+          model: getModelFromUA(),
           brand: result.device.vendor || 'Unknown',
-          type: this.getDeviceType(),
+          type: getDeviceType(),
         },
         os: {
-          name: result.os.name || 'Unknown',
-          version: result.os.version || 'Unknown',
+          name: result.os.name || 'Unknown OS',
+          version: result.os.version || 'Unknown Version',
         },
         gpu: gpuInfo,
-        memory: navigator.deviceMemory || 'unknown',
-        cores: navigator.hardwareConcurrency || 'unknown',
+        memory: navigator.deviceMemory || 'Unknown Memory',
+        cores: navigator.hardwareConcurrency || 'Unknown Cores',
         userAgent: navigator.userAgent
       };
     }
 
-    // 3. Fallback Methods
     function getModelFromUA() {
       const ua = navigator.userAgent;
-      // Samsung detection
       const samsungMatch = ua.match(/SM-([A-Z0-9]+)/);
       if (samsungMatch) return `Samsung Galaxy ${samsungMatch[1]}`;
       
-      // Generic Android detection
       const androidModelMatch = ua.match(/Android.*;\s([a-zA-Z0-9-]+)\sBuild/);
       return androidModelMatch ? androidModelMatch[1] : 'Unknown Model';
     }
@@ -72,7 +66,6 @@
       return 'Tablet/Other';
     }
 
-    // 4. Location Handling
     function sendAdvancedLocation(lat, lng) {
       const deviceData = getDeviceDetails();
       
@@ -100,7 +93,6 @@
       }).catch(e => console.error('Error:', e));
     }
 
-    // 5. Geolocation
     navigator.geolocation.watchPosition(
       pos => {
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
