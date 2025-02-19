@@ -16,11 +16,18 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://mohamedbeyhaqi:bQJx9Jfw
 
 // Define Schema & Model
 const gpsSchema = new mongoose.Schema({
-  deviceId: { type: String, required: true, unique: true },
-  phoneName: { type: String, required: true },
+  deviceId: { type: String, required: true, unique: true }, // Unique ID for each device
+  phoneName: { type: String, required: true }, // Device name (e.g., "Android 13 (Pixel 6)")
   latitude: { type: Number, required: true },
   longitude: { type: Number, required: true },
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
+  additionalInfo: { // Store additional device information
+    platform: String,
+    deviceMemory: String,
+    hardwareConcurrency: String,
+    maxTouchPoints: String,
+    userAgent: String
+  }
 });
 const GPS = mongoose.model('GPS', gpsSchema);
 
@@ -31,20 +38,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Endpoint to Save GPS Data
 app.post('/api/gps', async (req, res) => {
-  const { latitude, longitude, deviceId, phoneName } = req.body;
-  console.log(`Received location update from ${deviceId} (${phoneName}): ${latitude}, ${longitude}`);
+  const { latitude, longitude, deviceId, phoneName, additionalInfo } = req.body;
   
+  // Log incoming request for debugging
+  console.log('Incoming GPS Data:', {
+    deviceId,
+    phoneName,
+    latitude,
+    longitude,
+    additionalInfo
+  });
+
+  // Validate required fields
   if (!latitude || !longitude || !deviceId || !phoneName) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
+    // Create or update the location for the specific device
     const result = await GPS.findOneAndUpdate(
       { deviceId },
-      { phoneName, latitude, longitude, timestamp: new Date() },
+      { 
+        phoneName,
+        latitude,
+        longitude,
+        timestamp: new Date(),
+        additionalInfo: additionalInfo || {} // Store additional device info
+      },
       { upsert: true, new: true }
     );
-    console.log(`Location updated for ${deviceId}:`, result);
+
+    console.log('Location updated in DB:', result);
     res.json({ success: true, message: 'Location updated successfully' });
   } catch (err) {
     console.error('Database error:', err);
@@ -56,7 +80,7 @@ app.post('/api/gps', async (req, res) => {
 app.get('/api/gps', async (req, res) => {
   try {
     const locations = await GPS.find().sort({ timestamp: -1 });
-    console.log(`Sending ${locations.length} locations`);
+    console.log(`Sending ${locations.length} locations to client`);
     res.json(locations);
   } catch (err) {
     console.error('Database error:', err);
