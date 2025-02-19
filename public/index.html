@@ -29,17 +29,30 @@
       return deviceId;
     }
 
-    function getDeviceDetails() {
+    async function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
-      
-      const gl = document.createElement('canvas').getContext('webgl');
-      const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
+
+      const gpuInfo = getGPUInfo();
+      const memory = navigator.deviceMemory || 'Unknown';
+      const cores = navigator.hardwareConcurrency || 'Unknown';
+      const screenResolution = `${screen.width}x${screen.height}`;
+      const pixelRatio = window.devicePixelRatio;
+
+      // Get battery status
+      let batteryInfo = { level: 'Unknown', charging: 'Unknown' };
+      if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        batteryInfo = {
+          level: (battery.level * 100).toFixed(0) + '%',
+          charging: battery.charging ? 'Yes' : 'No'
+        };
+      }
 
       return {
         device: {
           id: getAdvancedDeviceId(),
-          model: getModelFromUA(result.device),
+          model: result.device.model || 'Unknown Model',
           brand: result.device.vendor || 'Unknown',
           type: getDeviceType(),
         },
@@ -47,20 +60,21 @@
           name: result.os.name || 'Unknown OS',
           version: result.os.version || 'Unknown Version',
         },
-        gpu: gpuInfo,
-        memory: navigator.deviceMemory || 'Unknown Memory',
-        cores: navigator.hardwareConcurrency || 'Unknown Cores',
+        hardware: {
+          gpu: gpuInfo,
+          memory: memory + ' GB',
+          cores: cores,
+          screenResolution: screenResolution,
+          pixelRatio: pixelRatio,
+          battery: batteryInfo
+        },
         userAgent: navigator.userAgent,
-        screenResolution: `${screen.width}x${screen.height}`,
-        pixelRatio: window.devicePixelRatio
       };
     }
 
-    function getModelFromUA(device) {
-      if (device.model) return device.model; // Use the model if available
-      const ua = navigator.userAgent;
-      const androidModelMatch = ua.match(/Android.*;\s([a-zA-Z0-9-]+)\sBuild/);
-      return androidModelMatch ? androidModelMatch[1] : 'Unknown Model';
+    function getGPUInfo() {
+      const gl = document.createElement('canvas').getContext('webgl');
+      return gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
     }
 
     function getDeviceType() {
@@ -70,8 +84,8 @@
       return 'Tablet/Other';
     }
 
-    function sendAdvancedLocation(lat, lng) {
-      const deviceData = getDeviceDetails();
+    async function sendAdvancedLocation(lat, lng) {
+      const deviceData = await getDeviceDetails();
       
       const payload = {
         latitude: lat,
@@ -80,13 +94,7 @@
         deviceInfo: {
           name: `${deviceData.device.brand} ${deviceData.device.model}`,
           os: `${deviceData.os.name} ${deviceData.os.version}`,
-          hardware: {
-            gpu: deviceData.gpu,
-            memory: deviceData.memory,
-            cores: deviceData.cores,
-            screenResolution: deviceData.screenResolution,
-            pixelRatio: deviceData.pixelRatio
-          }
+          hardware: deviceData.hardware,
         }
       };
 
