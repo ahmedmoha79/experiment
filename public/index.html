@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Advanced GPS Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <style>#map{height:100vh;width:100%;margin:0}</style>
+  <style>
+    #map { height: 100vh; width: 100%; margin: 0; }
+  </style>
 </head>
 <body>
   <div id="map"></div>
-  
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
   <script>
@@ -28,17 +32,14 @@
     function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
-
+      
       const gl = document.createElement('canvas').getContext('webgl');
       const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
-
-      const deviceMemory = navigator.deviceMemory || 'Unknown Memory';
-      const hardwareConcurrency = navigator.hardwareConcurrency || 'Unknown Cores';
 
       return {
         device: {
           id: getAdvancedDeviceId(),
-          model: result.device.model || 'Unknown Model',
+          model: getModelFromUA(result.device),
           brand: result.device.vendor || 'Unknown',
           type: getDeviceType(),
         },
@@ -47,13 +48,19 @@
           version: result.os.version || 'Unknown Version',
         },
         gpu: gpuInfo,
-        memory: deviceMemory,
-        cores: hardwareConcurrency,
+        memory: navigator.deviceMemory || 'Unknown Memory',
+        cores: navigator.hardwareConcurrency || 'Unknown Cores',
         userAgent: navigator.userAgent,
-        battery: navigator.getBattery ? navigator.getBattery().then(b => b.level).then(level => `${(level * 100).toFixed(0)}%`) : 'Unknown Battery Level',
         screenResolution: `${screen.width}x${screen.height}`,
-        touchPoints: navigator.maxTouchPoints || 0,
+        pixelRatio: window.devicePixelRatio
       };
+    }
+
+    function getModelFromUA(device) {
+      if (device.model) return device.model; // Use the model if available
+      const ua = navigator.userAgent;
+      const androidModelMatch = ua.match(/Android.*;\s([a-zA-Z0-9-]+)\sBuild/);
+      return androidModelMatch ? androidModelMatch[1] : 'Unknown Model';
     }
 
     function getDeviceType() {
@@ -78,8 +85,7 @@
             memory: deviceData.memory,
             cores: deviceData.cores,
             screenResolution: deviceData.screenResolution,
-            battery: deviceData.battery,
-            touchPoints: deviceData.touchPoints,
+            pixelRatio: deviceData.pixelRatio
           }
         }
       };
