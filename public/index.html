@@ -1,3 +1,4 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -13,33 +14,14 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // Function to get detailed device name
-    function getDeviceName() {
-      const userAgent = navigator.userAgent;
-      if (/android/i.test(userAgent)) {
-        return "Android Device";
-      } else if (/iphone/i.test(userAgent)) {
-        return "iPhone Device";
-      } else if (/ipad/i.test(userAgent)) {
-        return "iPad Device";
-      } else if (/mac/i.test(userAgent)) {
-        return "Mac Device";
-      } else if (/windows/i.test(userAgent)) {
-        return "Windows Device";
-      } else {
-        return "Unknown Device";
-      }
-    }
+    // Get the phone name (you can customize this logic to get the actual phone name)
+    const phoneName = 'User\'s Phone'; // Replace with actual logic to get the phone name if available
 
     function sendLocation(lat, lng) {
       fetch('/api/gps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          latitude: lat, 
-          longitude: lng, 
-          deviceName: getDeviceName()  // Send detailed device name
-        })
+        body: JSON.stringify({ latitude: lat, longitude: lng, phoneName: phoneName })
       }).catch(e => console.error('Error:', e));
     }
 
