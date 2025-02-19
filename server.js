@@ -8,22 +8,17 @@ const UAParser = require('ua-parser-js');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('MongoDB Connected'))
   .catch(err => console.error('MongoDB Error:', err));
 
-// Advanced Device Schema
 const gpsSchema = new mongoose.Schema({
   deviceId: { type: String, required: true, unique: true },
   location: {
-    type: { 
-      latitude: Number,
-      longitude: Number 
-    },
-    required: true
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true }
   },
   timestamp: { type: Date, default: Date.now },
   deviceInfo: {
@@ -31,11 +26,11 @@ const gpsSchema = new mongoose.Schema({
     os: String,
     hardware: {
       gpu: String,
-      memory: Number,
-      cores: Number
+      memory: String,
+      cores: String
     }
   },
-  rawData: { // Store original request data for debugging
+  rawData: {
     userAgent: String,
     payload: Object
   }
@@ -43,23 +38,20 @@ const gpsSchema = new mongoose.Schema({
 
 const GPS = mongoose.model('GPS', gpsSchema);
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Enhanced API Endpoint
 app.post('/api/gps', async (req, res) => {
   try {
-    const { latitude, longitude, deviceId, deviceInfo, ...rest } = req.body;
+    const { latitude, longitude, deviceId, deviceInfo } = req.body;
     
-    // Server-side UA parsing as backup
     const serverParser = new UAParser(req.headers['user-agent']);
     const serverOS = serverParser.getOS();
     
     const finalDeviceInfo = {
       ...deviceInfo,
-      serverDetectedOS: `${serverOS.name} ${serverOS.version}`
+      serverDetectedOS: `${serverOS.name || 'Unknown'} ${serverOS.version || 'Unknown'}`
     };
 
     const locationDoc = {
@@ -85,7 +77,6 @@ app.post('/api/gps', async (req, res) => {
   }
 });
 
-// Get All Devices
 app.get('/api/devices', async (req, res) => {
   try {
     const devices = await GPS.find().sort({ timestamp: -1 });
@@ -95,7 +86,6 @@ app.get('/api/devices', async (req, res) => {
   }
 });
 
-// Serve Frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
