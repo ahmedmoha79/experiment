@@ -24,10 +24,13 @@ const gpsSchema = new mongoose.Schema({
   deviceInfo: {
     name: String,
     os: String,
+    architecture: String,
     hardware: {
       gpu: String,
       memory: String,
-      cores: String
+      cores: String,
+      screenResolution: String,
+      battery: String
     }
   },
   rawData: {
@@ -45,13 +48,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/api/gps', async (req, res) => {
   try {
     const { latitude, longitude, deviceId, deviceInfo } = req.body;
-    
+
     const serverParser = new UAParser(req.headers['user-agent']);
     const serverOS = serverParser.getOS();
-    
+
     const finalDeviceInfo = {
       ...deviceInfo,
-      serverDetectedOS: `${serverOS.name || 'Unknown'} ${serverOS.version || 'Unknown'}`
+      serverDetectedOS: `${serverOS.name || 'Unknown'} ${serverOS.version || 'Unknown'}`,
     };
 
     const locationDoc = {
@@ -60,7 +63,7 @@ app.post('/api/gps', async (req, res) => {
       deviceInfo: finalDeviceInfo,
       rawData: {
         userAgent: req.headers['user-agent'],
-        payload: req.body
+        payload: req.body,
       }
     };
 
