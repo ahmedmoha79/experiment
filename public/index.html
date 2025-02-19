@@ -13,13 +13,21 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // Function to get device name (using a simple user agent check)
+    // Function to get detailed device name
     function getDeviceName() {
       const userAgent = navigator.userAgent;
-      if (/mobile/i.test(userAgent)) {
-        return "Mobile Device";
+      if (/android/i.test(userAgent)) {
+        return "Android Device";
+      } else if (/iphone/i.test(userAgent)) {
+        return "iPhone Device";
+      } else if (/ipad/i.test(userAgent)) {
+        return "iPad Device";
+      } else if (/mac/i.test(userAgent)) {
+        return "Mac Device";
+      } else if (/windows/i.test(userAgent)) {
+        return "Windows Device";
       } else {
-        return "Desktop Device";
+        return "Unknown Device";
       }
     }
 
@@ -30,7 +38,7 @@
         body: JSON.stringify({ 
           latitude: lat, 
           longitude: lng, 
-          deviceName: getDeviceName()  // Send device name
+          deviceName: getDeviceName()  // Send detailed device name
         })
       }).catch(e => console.error('Error:', e));
     }
