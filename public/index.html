@@ -23,15 +23,55 @@
       return deviceId;
     }
 
-    // Get simplified device name
+    // Improved device name detection
     function getDeviceName() {
       const ua = navigator.userAgent;
-      const match = ua.match(/\((.*?)\)/);
-      return match ? match[1] : "Unknown Device";
+      
+      // Try to get more specific device information
+      const deviceInfo = {
+        platform: navigator.platform,
+        userAgent: ua,
+        deviceMemory: navigator.deviceMemory || 'unknown',
+        hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+        maxTouchPoints: navigator.maxTouchPoints || 'unknown'
+      };
+
+      // Parse Android devices
+      if (/android/i.test(ua)) {
+        const androidVersionMatch = ua.match(/Android\s([0-9.]+)/);
+        const modelMatch = ua.match(/;\s([a-zA-Z0-9-]+)\sBuild/);
+        return `Android ${androidVersionMatch ? androidVersionMatch[1] : 'Unknown Version'} (${
+          modelMatch ? modelMatch[1] : 'Unknown Model'
+        })`;
+      }
+
+      // Parse iOS devices
+      if (/iphone|ipad|ipod/i.test(ua)) {
+        const iosVersionMatch = ua.match(/OS\s([0-9_]+)/);
+        return `iOS ${iosVersionMatch ? iosVersionMatch[1].replace(/_/g, '.') : 'Unknown Version'}`;
+      }
+
+      // Parse Windows devices
+      if (/windows/i.test(ua)) {
+        const windowsVersionMatch = ua.match(/Windows\sNT\s([0-9.]+)/);
+        return `Windows ${windowsVersionMatch ? windowsVersionMatch[1] : 'Unknown Version'}`;
+      }
+
+      // Parse Mac devices
+      if (/macintosh/i.test(ua)) {
+        const macVersionMatch = ua.match(/Mac OS X\s([0-9_]+)/);
+        return `Mac OS ${macVersionMatch ? macVersionMatch[1].replace(/_/g, '.') : 'Unknown Version'}`;
+      }
+
+      // Fallback to platform if no specific info found
+      return navigator.platform || 'Unknown Device';
     }
 
     const deviceId = getDeviceId();
     const phoneName = getDeviceName();
+
+    console.log('Device ID:', deviceId);
+    console.log('Device Name:', phoneName);
 
     function sendLocation(lat, lng) {
       fetch('/api/gps', {
