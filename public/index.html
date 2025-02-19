@@ -14,17 +14,13 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let marker;
 
-    // Extract device name from User-Agent
+    // Function to extract real phone model from User-Agent
     function getDeviceName() {
       const ua = navigator.userAgent;
-      if (/android/i.test(ua)) return 'Android Device';
-      if (/iphone/i.test(ua)) return 'iPhone';
-      if (/ipad/i.test(ua)) return 'iPad';
-      if (/windows/i.test(ua)) return 'Windows PC';
-      if (/macintosh|mac os x/i.test(ua)) return 'Mac Device';
-      return 'Unknown Device';
+      let match = ua.match(/\(([^)]+)\)/); // Extract details inside parentheses
+      return match ? match[1] : "Unknown Device";
     }
-    
+
     const phoneName = getDeviceName();
 
     function sendLocation(lat, lng) {
