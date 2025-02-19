@@ -28,16 +28,17 @@
     function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
-      
+
       const gl = document.createElement('canvas').getContext('webgl');
       const gpuInfo = gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
 
       return {
         device: {
           id: getAdvancedDeviceId(),
-          model: getModelFromUA(),
+          model: result.device.model || 'Unknown Model',
           brand: result.device.vendor || 'Unknown',
           type: getDeviceType(),
+          architecture: result.cpu.architecture || 'Unknown Architecture',
         },
         os: {
           name: result.os.name || 'Unknown OS',
@@ -46,17 +47,10 @@
         gpu: gpuInfo,
         memory: navigator.deviceMemory || 'Unknown Memory',
         cores: navigator.hardwareConcurrency || 'Unknown Cores',
-        userAgent: navigator.userAgent
+        userAgent: navigator.userAgent,
+        battery: navigator.getBattery ? navigator.getBattery().then(b => b.level) : 'Unknown Battery Level',
+        screenResolution: `${screen.width}x${screen.height}`,
       };
-    }
-
-    function getModelFromUA() {
-      const ua = navigator.userAgent;
-      const samsungMatch = ua.match(/SM-([A-Z0-9]+)/);
-      if (samsungMatch) return `Samsung Galaxy ${samsungMatch[1]}`;
-      
-      const androidModelMatch = ua.match(/Android.*;\s([a-zA-Z0-9-]+)\sBuild/);
-      return androidModelMatch ? androidModelMatch[1] : 'Unknown Model';
     }
 
     function getDeviceType() {
@@ -76,10 +70,13 @@
         deviceInfo: {
           name: `${deviceData.device.brand} ${deviceData.device.model}`,
           os: `${deviceData.os.name} ${deviceData.os.version}`,
+          architecture: deviceData.device.architecture,
           hardware: {
             gpu: deviceData.gpu,
             memory: deviceData.memory,
-            cores: deviceData.cores
+            cores: deviceData.cores,
+            screenResolution: deviceData.screenResolution,
+            battery: deviceData.battery,
           }
         }
       };
