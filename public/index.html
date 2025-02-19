@@ -8,6 +8,7 @@
 <body>
   <div id="map"></div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ua-parser-js/dist/ua-parser.min.js"></script>
   <script>
     const map = L.map('map').setView([-13.1339, 27.8493], 10);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -23,55 +24,26 @@
       return deviceId;
     }
 
-    // Improved device name detection
-    function getDeviceName() {
-      const ua = navigator.userAgent;
-      
-      // Try to get more specific device information
-      const deviceInfo = {
-        platform: navigator.platform,
-        userAgent: ua,
-        deviceMemory: navigator.deviceMemory || 'unknown',
-        hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
-        maxTouchPoints: navigator.maxTouchPoints || 'unknown'
+    // Advanced device name detection using UAParser.js
+    function getDeviceInfo() {
+      const parser = new UAParser();
+      const result = parser.getResult();
+
+      return {
+        deviceId: getDeviceId(),
+        deviceName: result.device.model || result.os.name || 'Unknown Device',
+        deviceBrand: result.device.vendor || 'Unknown Brand',
+        os: result.os.name || 'Unknown OS',
+        osVersion: result.os.version || 'Unknown Version',
+        browser: result.browser.name || 'Unknown Browser',
+        browserVersion: result.browser.version || 'Unknown Version',
+        cpu: result.cpu.architecture || 'Unknown CPU',
+        userAgent: navigator.userAgent
       };
-
-      // Parse Android devices
-      if (/android/i.test(ua)) {
-        const androidVersionMatch = ua.match(/Android\s([0-9.]+)/);
-        const modelMatch = ua.match(/;\s([a-zA-Z0-9-]+)\sBuild/);
-        return `Android ${androidVersionMatch ? androidVersionMatch[1] : 'Unknown Version'} (${
-          modelMatch ? modelMatch[1] : 'Unknown Model'
-        })`;
-      }
-
-      // Parse iOS devices
-      if (/iphone|ipad|ipod/i.test(ua)) {
-        const iosVersionMatch = ua.match(/OS\s([0-9_]+)/);
-        return `iOS ${iosVersionMatch ? iosVersionMatch[1].replace(/_/g, '.') : 'Unknown Version'}`;
-      }
-
-      // Parse Windows devices
-      if (/windows/i.test(ua)) {
-        const windowsVersionMatch = ua.match(/Windows\sNT\s([0-9.]+)/);
-        return `Windows ${windowsVersionMatch ? windowsVersionMatch[1] : 'Unknown Version'}`;
-      }
-
-      // Parse Mac devices
-      if (/macintosh/i.test(ua)) {
-        const macVersionMatch = ua.match(/Mac OS X\s([0-9_]+)/);
-        return `Mac OS ${macVersionMatch ? macVersionMatch[1].replace(/_/g, '.') : 'Unknown Version'}`;
-      }
-
-      // Fallback to platform if no specific info found
-      return navigator.platform || 'Unknown Device';
     }
 
-    const deviceId = getDeviceId();
-    const phoneName = getDeviceName();
-
-    console.log('Device ID:', deviceId);
-    console.log('Device Name:', phoneName);
+    const deviceInfo = getDeviceInfo();
+    console.log('Device Info:', deviceInfo);
 
     function sendLocation(lat, lng) {
       fetch('/api/gps', {
@@ -80,8 +52,9 @@
         body: JSON.stringify({ 
           latitude: lat, 
           longitude: lng, 
-          deviceId: deviceId,
-          phoneName: phoneName
+          deviceId: deviceInfo.deviceId,
+          phoneName: `${deviceInfo.deviceBrand} ${deviceInfo.deviceName} (${deviceInfo.os} ${deviceInfo.osVersion})`,
+          additionalInfo: deviceInfo
         })
       })
       .then(response => {
