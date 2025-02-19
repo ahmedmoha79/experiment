@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -8,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect(process.env.MONGO_URI || '<mongodb+srv://mohamedbeyhaqi:bQJx9JfwQNlJEXOE@cluster0.eu65h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0>', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('MongoDB Connected'))
@@ -16,9 +17,9 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Define Schema & Model
 const gpsSchema = new mongoose.Schema({
+  phoneName: String,
   latitude: Number,
   longitude: Number,
-  deviceName: String,  // Store device name
   timestamp: { type: Date, default: Date.now }
 });
 const GPS = mongoose.model('GPS', gpsSchema);
@@ -30,18 +31,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Endpoint to Save GPS Data
 app.post('/api/gps', async (req, res) => {
-  const { latitude, longitude, deviceName } = req.body;
-  if (!latitude || !longitude || !deviceName) 
-    return res.status(400).json({ error: 'Missing coordinates or device name' });
+  const { latitude, longitude, phoneName } = req.body;
+  if (!latitude || !longitude || !phoneName) return res.status(400).json({ error: 'Missing coordinates or phone name' });
 
   try {
-    // Update existing record or create a new one
-    const existingRecord = await GPS.findOneAndUpdate(
-      { deviceName: deviceName },
-      { latitude, longitude, timestamp: Date.now() },
-      { new: true, upsert: true } // Create if not found
-    );
-    res.json({ success: true, record: existingRecord });
+    // Update or create a record for the phone
+    await GPS.updateOne({ phoneName }, { latitude, longitude, timestamp: new Date() }, { upsert: true });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'DB Error' });
   }
