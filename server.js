@@ -8,12 +8,14 @@ const UAParser = require('ua-parser-js');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// MongoDB Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://mohamedbeyhaqi:bQJx9JfwQNlJEXOE@cluster0.eu65h.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('MongoDB Connected'))
   .catch(err => console.error('MongoDB Error:', err));
 
+// GPS Schema
 const gpsSchema = new mongoose.Schema({
   deviceId: { type: String, required: true, unique: true },
   location: {
@@ -29,8 +31,11 @@ const gpsSchema = new mongoose.Schema({
       memory: String,
       cores: String,
       screenResolution: String,
-      battery: String,
-      touchPoints: Number,
+      pixelRatio: String,
+      battery: {
+        level: String,
+        charging: String
+      }
     }
   },
   rawData: {
@@ -39,31 +44,40 @@ const gpsSchema = new mongoose.Schema({
   }
 });
 
+// GPS Model
 const GPS = mongoose.model('GPS', gpsSchema);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Route to handle GPS data
 app.post('/api/gps', async (req, res) => {
   try {
     const { latitude, longitude, deviceId, deviceInfo } = req.body;
 
-    const serverParser = new UAParser(req.headers['user-agent']);
-    const serverOS = serverParser.getOS();
-
-    const finalDeviceInfo = {
-      ...deviceInfo,
-      serverDetectedOS: `${serverOS.name || 'Unknown'} ${serverOS.version || 'Unknown'}`,
-    };
-
+    // Create a new document or update the existing one
     const locationDoc = {
       deviceId,
       location: { latitude, longitude },
-      deviceInfo: finalDeviceInfo,
+      deviceInfo: {
+        name: deviceInfo.name,
+        os: deviceInfo.os,
+        hardware: {
+          gpu: deviceInfo.hardware.gpu,
+          memory: deviceInfo.hardware.memory,
+          cores: deviceInfo.hardware.cores,
+          screenResolution: deviceInfo.hardware.screenResolution,
+          pixelRatio: deviceInfo.hardware.pixelRatio,
+          battery: {
+            level: deviceInfo.hardware.battery.level,
+            charging: deviceInfo.hardware.battery.charging
+          }
+        }
+      },
       rawData: {
         userAgent: req.headers['user-agent'],
-        payload: req.body,
+        payload: req.body
       }
     };
 
@@ -80,6 +94,7 @@ app.post('/api/gps', async (req, res) => {
   }
 });
 
+// Route to get all devices
 app.get('/api/devices', async (req, res) => {
   try {
     const devices = await GPS.find().sort({ timestamp: -1 });
@@ -89,8 +104,10 @@ app.get('/api/devices', async (req, res) => {
   }
 });
 
+// Serve the main HTML file
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Start the server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
