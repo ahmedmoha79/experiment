@@ -3,7 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const UAParser = require('ua-parser-js');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -47,11 +46,12 @@ const gpsSchema = new mongoose.Schema({
 // GPS Model
 const GPS = mongoose.model('GPS', gpsSchema);
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Route to handle GPS data
+// Route to handle GPS data (optimized for frequent updates)
 app.post('/api/gps', async (req, res) => {
   try {
     const { latitude, longitude, deviceId, deviceInfo } = req.body;
@@ -81,11 +81,16 @@ app.post('/api/gps', async (req, res) => {
       }
     };
 
-    await GPS.findOneAndUpdate(
-      { deviceId },
-      locationDoc,
-      { upsert: true, new: true }
-    );
+    // Use bulkWrite for optimized updates
+    await GPS.bulkWrite([
+      {
+        updateOne: {
+          filter: { deviceId },
+          update: { $set: locationDoc },
+          upsert: true
+        }
+      }
+    ]);
 
     res.json({ success: true });
   } catch (err) {
@@ -94,10 +99,10 @@ app.post('/api/gps', async (req, res) => {
   }
 });
 
-// Route to get all devices
+// Route to get all devices (optimized for real-time updates)
 app.get('/api/devices', async (req, res) => {
   try {
-    const devices = await GPS.find().sort({ timestamp: -1 });
+    const devices = await GPS.find().sort({ timestamp: -1 }).limit(100); // Limit to 100 devices for performance
     res.json(devices);
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
