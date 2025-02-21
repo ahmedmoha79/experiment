@@ -8,9 +8,9 @@
   <style>
     #map { height: 100vh; width: 100%; margin: 0; }
     .emoji-marker { 
-      font-size: 32px; /* Increased size */
-      text-shadow: 0 0 8px white, 0 0 8px white; /* Better visibility */
-      filter: drop-shadow(0 0 4px black); /* Added border effect */
+      font-size: 32px;
+      text-shadow: 0 0 8px white, 0 0 8px white;
+      filter: drop-shadow(0 0 4px black);
     }
   </style>
 </head>
@@ -20,18 +20,16 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
   <script>
-    // Initialize map with higher zoom level
     const map = L.map('map', {
       zoomControl: true,
-      maxZoom: 18, // Increased max zoom level
+      maxZoom: 18,
       minZoom: 2
-    }).setView([-13.1339, 27.8493], 15); // Higher initial zoom level
+    }).setView([-13.1339, 27.8493], 15);
 
-    // Base layers configuration
     const baseLayers = {
       "Street View": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
-      }),
+      }).addTo(map),
       "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: '© Esri'
       }),
@@ -39,73 +37,41 @@
         attribution: '© OpenTopoMap'
       })
     };
-
-    // Add default layer and layer control
-    baseLayers["Street View"].addTo(map);
     L.control.layers(baseLayers).addTo(map);
 
-    let marker;
-
-    // Create person emoji marker (larger and more visible)
     function createPersonEmoji() {
       return L.divIcon({
         className: 'emoji-marker',
-        html: '🚶‍♂️', // Walking man emoji
-        iconSize: [48, 48], // Increased size
-        iconAnchor: [24, 48] // Centered anchor
+        html: '🚶‍♂️',
+        iconSize: [48, 48],
+        iconAnchor: [24, 48]
       });
-    }
-
-    function getAdvancedDeviceId() {
-      let deviceId = localStorage.getItem('advDeviceId');
-      if (!deviceId) {
-        const rand = crypto.getRandomValues(new Uint32Array(4));
-        deviceId = `DEV-${rand[0]}-${Date.now()}`;
-        localStorage.setItem('advDeviceId', deviceId);
-      }
-      return deviceId;
     }
 
     async function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
-
       const gpuInfo = getGPUInfo();
       const memory = navigator.deviceMemory || 'Unknown';
       const cores = navigator.hardwareConcurrency || 'Unknown';
       const screenResolution = `${screen.width}x${screen.height}`;
       const pixelRatio = window.devicePixelRatio;
-
-      // Get battery status
       let batteryInfo = { level: 'Unknown', charging: 'Unknown' };
-      if ('getBattery' in navigator) {
+      if (navigator.getBattery) {
         const battery = await navigator.getBattery();
-        batteryInfo = {
-          level: (battery.level * 100).toFixed(0) + '%',
-          charging: battery.charging ? 'Yes' : 'No'
-        };
+        batteryInfo = { level: `${(battery.level * 100).toFixed(0)}%`, charging: battery.charging ? 'Yes' : 'No' };
       }
-
       return {
-        device: {
-          id: getAdvancedDeviceId(),
-          model: result.device.model || 'Unknown Model',
-          brand: result.device.vendor || 'Unknown',
-          type: getDeviceType(),
-        },
-        os: {
-          name: result.os.name || 'Unknown OS',
-          version: result.os.version || 'Unknown Version',
-        },
-        hardware: {
-          gpu: gpuInfo,
-          memory: memory + ' GB',
-          cores: cores,
-          screenResolution: screenResolution,
-          pixelRatio: pixelRatio,
-          battery: batteryInfo
-        },
-        userAgent: navigator.userAgent,
+        deviceId: getDeviceId(),
+        brand: result.device.vendor || 'Unknown',
+        model: result.device.model || 'Unknown Model',
+        os: `${result.os.name || 'Unknown OS'} ${result.os.version || ''}`,
+        gpu: gpuInfo,
+        memory: `${memory} GB`,
+        cores,
+        screenResolution,
+        pixelRatio,
+        battery: batteryInfo
       };
     }
 
@@ -114,63 +80,47 @@
       return gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
     }
 
-    function getDeviceType() {
-      const touchPoints = navigator.maxTouchPoints || 0;
-      if (touchPoints > 2) return 'Smartphone';
-      if (screen.width > 1024) return 'Desktop';
-      return 'Tablet/Other';
+    function getDeviceId() {
+      let deviceId = localStorage.getItem('deviceId');
+      if (!deviceId) {
+        deviceId = `DEV-${crypto.getRandomValues(new Uint32Array(1))[0]}-${Date.now()}`;
+        localStorage.setItem('deviceId', deviceId);
+      }
+      return deviceId;
     }
 
-    async function sendAdvancedLocation(lat, lng) {
+    async function sendLocation(lat, lng) {
       const deviceData = await getDeviceDetails();
-      
       const payload = {
         latitude: lat,
         longitude: lng,
-        deviceId: deviceData.device.id,
-        deviceInfo: {
-          name: `${deviceData.device.brand} ${deviceData.device.model}`,
-          os: `${deviceData.os.name} ${deviceData.os.version}`,
-          hardware: deviceData.hardware,
-        }
+        device: deviceData
       };
-
       console.log('Sending:', payload);
-      
       fetch('/api/gps', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload)
-      }).catch(e => console.error('Error:', e));
+      }).catch(console.error);
     }
 
-    // Real-time updates every 2 seconds
-    let lastPosition = null;
+    let marker, lastPosition = null;
     setInterval(() => {
       navigator.geolocation.getCurrentPosition(
         pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-
-          // Only update if position has changed
+          const { latitude: lat, longitude: lng } = pos.coords;
           if (!lastPosition || lastPosition.lat !== lat || lastPosition.lng !== lng) {
             if (marker) marker.remove();
-
-            // Create new marker with person emoji
-            marker = L.marker([lat, lng], {
-              icon: createPersonEmoji()
-            }).addTo(map);
-
-            map.setView([lat, lng], map.getZoom()); // Maintain current zoom level
-            sendAdvancedLocation(lat, lng);
-
+            marker = L.marker([lat, lng], { icon: createPersonEmoji() }).addTo(map);
+            map.setView([lat, lng], map.getZoom());
+            sendLocation(lat, lng);
             lastPosition = { lat, lng };
           }
         },
-        err => alert('GPS Error: ' + err.message),
+        err => console.error('GPS Error:', err.message),
         { enableHighAccuracy: true }
       );
-    }, 2000); // Fetch every 2 seconds
+    }, 2000);
   </script>
 </body>
 </html>
