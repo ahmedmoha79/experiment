@@ -3,60 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPS Route Tracker</title>
+  <title>Advanced GPS Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     #map { height: 80vh; width: 100%; margin: 0; }
-    #routeForm { padding: 10px; background: #f8f9fa; }
+    .emoji-marker { 
+      font-size: 32px;
+      text-shadow: 0 0 8px white, 0 0 8px white;
+      filter: drop-shadow(0 0 4px black);
+    }
+    #routeForm { padding: 10px; background: #fff; }
   </style>
 </head>
 <body>
   <div id="routeForm">
-    <label>Start Location: <input type="text" id="startLocation" placeholder="Enter start"/></label>
-    <label>End Location: <input type="text" id="endLocation" placeholder="Enter end"/></label>
+    <label>Start Location: <input type="text" id="startLocation"></label>
+    <label>End Location: <input type="text" id="endLocation"></label>
     <button onclick="calculateRoute()">Get Route</button>
   </div>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
   <script>
     const API_KEY = "5b3ce3597851110001cf6248de9aff3f1eee414e8b723ea40dd42de4";
+    const API_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
+    
     const map = L.map('map').setView([0, 0], 2);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    let routeLayer;
+    let marker;
+
+    function createPersonEmoji() {
+      return L.divIcon({
+        className: 'emoji-marker',
+        html: '🚶‍♂️',
+        iconSize: [48, 48],
+        iconAnchor: [24, 48]
+      });
+    }
+
+    async function getDeviceDetails() {
+      const parser = new UAParser();
+      const result = parser.getResult();
+      return {
+        deviceId: navigator.userAgent,
+        model: result.device.model || 'Unknown Model',
+        os: result.os.name || 'Unknown OS',
+      };
+    }
+
+    function trackLocation() {
+      navigator.geolocation.watchPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (marker) marker.remove();
+        marker = L.marker([lat, lng], { icon: createPersonEmoji() }).addTo(map);
+        map.setView([lat, lng], 15);
+      }, err => console.error('GPS Error:', err.message), { enableHighAccuracy: true });
+    }
+    
     async function calculateRoute() {
-      const start = document.getElementById('startLocation').value;
-      const end = document.getElementById('endLocation').value;
+      const start = document.getElementById("startLocation").value;
+      const end = document.getElementById("endLocation").value;
+      
       if (!start || !end) {
         alert("Please enter both start and end locations.");
         return;
       }
       
-      const geocode = async (address) => {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${address}`);
-        const data = await res.json();
-        return data.length ? [data[0].lat, data[0].lon] : null;
-      };
-      
-      const startCoords = await geocode(start);
-      const endCoords = await geocode(end);
-      if (!startCoords || !endCoords) {
-        alert("Invalid location");
-        return;
-      }
-      
-      const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${API_KEY}&start=${startCoords[1]},${startCoords[0]}&end=${endCoords[1]},${endCoords[0]}`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_URL}?api_key=${API_KEY}&start=${start}&end=${end}`);
       const data = await response.json();
-      
-      if (routeLayer) routeLayer.remove();
-      const routeCoords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
-      routeLayer = L.polyline(routeCoords, { color: 'blue' }).addTo(map);
-      map.fitBounds(routeLayer.getBounds());
+      console.log(data);
     }
+
+    trackLocation();
   </script>
 </body>
 </html>
