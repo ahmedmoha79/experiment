@@ -8,23 +8,32 @@
   <style>
     #map { height: 100vh; width: 100%; margin: 0; }
     .emoji-marker { 
-      font-size: 32px;
-      text-shadow: 0 0 8px white, 0 0 8px white;
-      filter: drop-shadow(0 0 4px black);
+      font-size: 32px; /* Increased size */
+      text-shadow: 0 0 8px white, 0 0 8px white; /* Better visibility */
+      filter: drop-shadow(0 0 4px black); /* Added border effect */
+    }
+    .info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <form id="locationForm">
-    <label for="destination">Enter Destination:</label>
-    <input type="text" id="destination" name="destination" required>
-    <button type="submit">Go</button>
-  </form>
+  <div class="info">
+    <h3>Location Info</h3>
+    <p id="location-details">Waiting for location...</p>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
   <script>
+    const apiKey = '5b3ce3597851110001cf6248de9aff3f1eee414e8b723ea40dd42de4'; // OpenRoute Services API Key
     const map = L.map('map', {
       zoomControl: true,
       maxZoom: 18,
@@ -32,9 +41,17 @@
     }).setView([-13.1339, 27.8493], 15);
 
     const baseLayers = {
-      "Street View": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
-      "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri' })
+      "Street View": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }),
+      "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri'
+      }),
+      "Topography": L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap'
+      })
     };
+
     baseLayers["Street View"].addTo(map);
     L.control.layers(baseLayers).addTo(map);
 
@@ -49,24 +66,109 @@
       });
     }
 
+    function getAdvancedDeviceId() {
+      let deviceId = localStorage.getItem('advDeviceId');
+      if (!deviceId) {
+        const rand = crypto.getRandomValues(new Uint32Array(4));
+        deviceId = `DEV-${rand[0]}-${Date.now()}`;
+        localStorage.setItem('advDeviceId', deviceId);
+      }
+      return deviceId;
+    }
+
     async function getDeviceDetails() {
       const parser = new UAParser();
       const result = parser.getResult();
+      const gpuInfo = getGPUInfo();
+      const memory = navigator.deviceMemory || 'Unknown';
+      const cores = navigator.hardwareConcurrency || 'Unknown';
+      const screenResolution = `${screen.width}x${screen.height}`;
+      const pixelRatio = window.devicePixelRatio;
+
+      let batteryInfo = { level: 'Unknown', charging: 'Unknown' };
+      if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        batteryInfo = {
+          level: (battery.level * 100).toFixed(0) + '%',
+          charging: battery.charging ? 'Yes' : 'No'
+        };
+      }
+
       return {
-        deviceId: localStorage.getItem('advDeviceId') || `DEV-${Date.now()}`,
-        os: `${result.os.name} ${result.os.version}`,
-        userAgent: navigator.userAgent
+        device: {
+          id: getAdvancedDeviceId(),
+          model: result.device.model || 'Unknown Model',
+          brand: result.device.vendor || 'Unknown',
+          type: getDeviceType(),
+        },
+        os: {
+          name: result.os.name || 'Unknown OS',
+          version: result.os.version || 'Unknown Version',
+        },
+        hardware: {
+          gpu: gpuInfo,
+          memory: memory + ' GB',
+          cores: cores,
+          screenResolution: screenResolution,
+          pixelRatio: pixelRatio,
+          battery: batteryInfo
+        },
+        userAgent: navigator.userAgent,
       };
+    }
+
+    function getGPUInfo() {
+      const gl = document.createElement('canvas').getContext('webgl');
+      return gl ? gl.getParameter(gl.UNMASKED_RENDERER_WEBGL) : 'Unknown GPU';
+    }
+
+    function getDeviceType() {
+      const touchPoints = navigator.maxTouchPoints || 0;
+      if (touchPoints > 2) return 'Smartphone';
+      if (screen.width > 1024) return 'Desktop';
+      return 'Tablet/Other';
     }
 
     async function sendAdvancedLocation(lat, lng) {
       const deviceData = await getDeviceDetails();
-      const payload = { latitude: lat, longitude: lng, device: deviceData };
+      
+      const payload = {
+        latitude: lat,
+        longitude: lng,
+        deviceId: deviceData.device.id,
+        deviceInfo: {
+          name: `${deviceData.device.brand} ${deviceData.device.model}`,
+          os: `${deviceData.os.name} ${deviceData.os.version}`,
+          hardware: deviceData.hardware,
+        }
+      };
+
+      console.log('Sending:', payload);
+      
       fetch('/api/gps', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(payload)
       }).catch(e => console.error('Error:', e));
+    }
+
+    async function fetchRoute(startCoords, endCoords) {
+      const response = await fetch(`https://api.openrouteservice.org/v2/directions/driving-car?start=${startCoords.join(',')}&end=${endCoords.join(',')}`, {
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Error fetching route:', response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+      const routeCoordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert to [lat, lng]
+
+      L.polyline(routeCoordinates, { color: 'blue' }).addTo(map); // Draw route on map
     }
 
     let lastPosition = null;
@@ -75,27 +177,30 @@
         pos => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
+
+          // Only update if position has changed
           if (!lastPosition || lastPosition.lat !== lat || lastPosition.lng !== lng) {
             if (marker) marker.remove();
-            marker = L.marker([lat, lng], { icon: createPersonEmoji() }).addTo(map);
+
+            // Create new marker with person emoji
+            marker = L.marker([lat, lng], {
+              icon: createPersonEmoji()
+            }).addTo(map);
+
             map.setView([lat, lng], map.getZoom());
             sendAdvancedLocation(lat, lng);
+            document.getElementById('location-details').innerText = `Latitude: ${lat.toFixed(6)}, Longitude: ${lng.toFixed(6)}`;
+            
+            // Fetch and display route from a fixed point to the current location
+            fetchRoute([-13.1339, 27.8493], [lat, lng]); // Example route from initial point to current location
+
             lastPosition = { lat, lng };
           }
         },
         err => alert('GPS Error: ' + err.message),
         { enableHighAccuracy: true }
       );
-    }, 2000);
-
-    document.getElementById('locationForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const destination = document.getElementById('destination').value;
-      fetch(`/api/directions?destination=${encodeURIComponent(destination)}`)
-        .then(res => res.json())
-        .then(data => console.log('Route:', data))
-        .catch(err => console.error('Error:', err));
-    });
+    }, 2000); // Fetch every 2 seconds
   </script>
 </body>
 </html>
